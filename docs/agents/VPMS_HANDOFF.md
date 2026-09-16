@@ -1,57 +1,87 @@
 # VPMS Handoff — Open Notebook
 
-VPMS_WORKSTREAM_ID: `VPMS-P4-OPENNOTEBOOK`  
+VPMS_WORKSTREAM_ID: `SUP-20260916-AVATAR-OPENNOTEBOOK-PRODUCTION-CLOSURE / OPENNOTEBOOK`  
 PROJECT_NAME: Open Notebook  
 REPOSITORY: `Joeplouis/open-notebook`  
 TARGET_BRANCH: `feat/vpms-production-hardening`  
-BASELINE_SHA: `9bd5f89c5985ffd277cfacece995a75c3ff2ea2a`  
-CURRENT_BRANCH_HEAD_AT_HANDOFF_CREATION: `c3285ffdcc1a0523013953fd4146eacb31c0f35e`  
+CURRENT_BRANCH_HEAD_BEFORE_ASSIGNMENT: `c2a5709951e00a6d4b792e771b01ad31c5ebea1b`  
 GOVERNING_PHASE: Phase 4D — Open Notebook podcast intelligence  
-GOVERNING_SPEC: VPMS v2.1 master PRD + Open Notebook native AGENTS/VISION/architecture + cross-repo handoff contract  
+GOVERNING_SPEC: VPMS v2.1 master PRD + native Open Notebook AGENTS/VISION/architecture/ADRs + cross-repo handoff contract  
 PROGRAM_COORDINATOR: VPMS Program Coordinator  
-IMPLEMENTATION_AGENT: UNASSIGNED  
-EVALUATOR: UNASSIGNED; must differ from implementer  
 SESSION_SUPERVISOR: ChatGPT VPMS Active Session Supervisor  
-STATUS: HARDENING_PRESENT / WAITING_FOR_DEPENDENCY_VALID_BOUNDED_ASSIGNMENT
+STATUS: `PRODUCTION_CLOSURE_ACTIVE`
 
-## Native project rules remain authoritative internally
+## Native ownership remains authoritative
 
-Open Notebook's existing `AGENTS.md`, `VISION.md`, architecture docs and ADRs remain authoritative for its internal implementation. VPMS integration may add/extend contracts but must not break Open Notebook's async-first architecture or turn it into a video renderer.
+Open Notebook remains the podcast intelligence engine. Its native async architecture must be reused rather than reimplemented inside VPMS.
 
-## Ownership
+Open Notebook owns:
 
-OWNERSHIP_WRITE_PATHS: only Open Notebook paths explicitly granted by the bounded VPMS workstream.  
-READ_ONLY_DEPENDENCIES: VPMS podcast/source contracts, SpeakerProfileV1/DialogueTurnV1/visual cue schema, Quadran evidence contract.  
-SHARED_FILES_REQUIRING_COORDINATOR_OWNERSHIP: canonical cross-repo contract versions and VPMS schemas.
-
-## Required VPMS role
-
-Open Notebook is the mandatory podcast intelligence engine for VPMS podcast/long-form flows. It must accept `quadran | research | script | hybrid` inputs and produce a canonical package containing source synthesis, outline, 1–4 speaker dialogue, stable `turn_id` + `speaker_id`, chapter/segment structure, facts/data for visual use, visual/B-roll cues and downstream-ready metadata.
+- source ingestion/synthesis;
+- outline/script intelligence;
+- canonical 1–4 speaker dialogue package;
+- stable `turn_id` / `speaker_id` output;
+- segment/chapter structure;
+- facts/data/visual/B-roll cues and provenance.
 
 It does NOT own:
 
 - VPMS global lifecycle;
-- FishAudio speaker voice execution;
+- FishAudio execution;
 - Avatar-Webinar/H3 rendering;
 - VMF/OpenMontage composition;
 - publishing.
 
-INPUT_CONTRACTS: `PodcastSourcePackageV1`, `SpeakerProfileV1`, evidence/research inputs.  
-OUTPUT_CONTRACTS: `OpenNotebookPodcastPackageV1`, `DialogueTurnV1` sequence and visual intelligence package.  
-UPSTREAM_HANDOFFS: source app / Quadran / VPMS.  
-DOWNSTREAM_HANDOFFS: script evaluator, FishAudio, visual director, VPMS.
+## Supervisor finding that makes this P0
 
-TEST_REQUIREMENTS: 1/2/3/4-speaker deterministic identity contract tests, source-mode tests, async worker path tests, schema validation, regression suite.  
-EVIDENCE_REQUIREMENTS: exact SHA, test outputs, sample canonical packages, no identity inference from array position.  
-FORBIDDEN_REFACTORS: no unrelated product redesign; no rendering/provider orchestration that belongs to other VPMS workers.  
-FORBIDDEN_ACTIONS: no provider spend unless authorized; no self-evaluation.
+The current VPMS feature branch does **not** yet invoke this real fork for production. Its current `vpms/adapters/open_notebook/worker.py` and `vpms/core/podcast_service.py` generate canned/synthetic podcast packages rather than exercising the native Open Notebook runtime.
 
-LAST_COMPLETED_ITEM: production hardening commit `c3285ffdcc1a0523013953fd4146eacb31c0f35e`.  
-CURRENT_TASK: no new Phase-4 implementation until dependency-valid assignment.  
-IMPLEMENTATION_SHA: none for the Phase-4 canonical package workstream  
-EVALUATOR_VERDICT: none  
-SUPERVISOR_VERDICT: pending future workstream  
-UNRESOLVED_DEFECTS: exact governed stable `turn_id`/`speaker_id` VPMS package not yet production-proven.  
-BLOCKERS: Phase-3/common-contract gates and bounded assignment.  
-NEXT_DEPENDENCY_VALID_ITEM: podcast contract alignment/implementation after coordinator releases the Phase-4 workstream.  
-LAST_UPDATED_AT: 2026-09-14
+The existing `feat/vpms-production-hardening` branch is only three commits ahead of `main`; its VPMS-specific changes are handoff/integration documentation plus production configuration validation. It does not by itself close the canonical Phase-4 package/runtime bridge.
+
+Therefore the real fork integration is now authorized and required.
+
+## Current assignment
+
+Read the complete supervisor program in:
+
+`Joeplouis/video-production-management-system`  
+branch: `feat/vpms-production-launch`  
+file: `docs/agents/SUP-20260916-AVATAR-OPENNOTEBOOK-PRODUCTION-CLOSURE.md`
+
+Execute the Open Notebook portion as one complete bounded workstream. Do not stop after each small endpoint/schema change asking for another assignment.
+
+## Required implementation outcome
+
+- Provide a real, documented integration surface the VPMS adapter can invoke using Open Notebook's native async job model.
+- Accept `quadran | research | script | hybrid` source modes.
+- Accept canonical `SpeakerProfileV1`-equivalent identity inputs for 1–4 speakers without positional identity inference.
+- Produce the complete canonical Open Notebook podcast package required by VPMS, including stable turn IDs, speaker IDs, source/evidence provenance, outline/segment structure, visual cues and downstream metadata.
+- Expose truthful job status/failure state. No fake immediate success around async native work.
+- Production health must reflect the real service/runtime and dependencies.
+- No rendering/provider orchestration that belongs to Avatar-Webinar, H3, FishAudio or VMF.
+- Simulation/test fixtures must be explicitly test-only and impossible to confuse with production output.
+
+## Required tests/evidence
+
+- native Open Notebook regression suite remains green;
+- 1/2/3/4-speaker canonical package contract tests;
+- all four source-mode tests;
+- async dispatch/status/failure tests;
+- provenance/evidence tests;
+- no positional identity inference tests;
+- exact SHA and changed-file list;
+- sample canonical packages generated by the real runtime using no-cost/local configuration where available;
+- independent exact-SHA evaluator verdict.
+
+## Hard gates
+
+- No merge to `main` before ChatGPT supervisor acceptance.
+- No paid model/provider spend without explicit authorization.
+- No fake production evidence.
+- No self-evaluation.
+
+CURRENT_TASK: complete the Open Notebook portion of `SUP-20260916-AVATAR-OPENNOTEBOOK-PRODUCTION-CLOSURE`.  
+IMPLEMENTER_VERDICT: pending.  
+EVALUATOR_VERDICT: pending independent exact-SHA review.  
+SUPERVISOR_VERDICT: production integration pending.  
+NEXT_RETURN: one final evidence package after complete no-cost implementation/evaluation, or one genuine external/paid-provider blocker.
