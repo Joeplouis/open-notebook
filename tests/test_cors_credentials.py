@@ -37,8 +37,11 @@ class TestRealAppDefaultsToNoCredentialsWithWildcard:
 
     def test_real_response_does_not_claim_allow_credentials(self):
         client = TestClient(api_main.app)
+        # Probe via the root endpoint: /health is now TRUTHFUL (SUP-20260916)
+        # and returns 503 without a reachable SurrealDB. CORS middleware
+        # applies to every response, so `/` exercises the same headers.
         response = client.get(
-            "/health", headers={"Origin": "https://evil.example.com"}
+            "/", headers={"Origin": "https://evil.example.com"}
         )
         assert response.status_code == 200
         assert "access-control-allow-credentials" not in {

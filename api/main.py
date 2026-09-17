@@ -44,8 +44,10 @@ from api.routers import (
     sources,
     speaker_profiles,
     transformations,
+    vpms_package,
 )
 from api.routers import commands as commands_router
+from open_notebook.database.repository import repo_query
 from open_notebook.database.async_migrate import AsyncMigrationManager
 from open_notebook.exceptions import (
     AuthenticationError,
@@ -188,6 +190,12 @@ async def lifespan(app: FastAPI):
     """
     # Startup: Security checks
     logger.info("Starting API initialization...")
+
+    # Explicit production/strict-mode startup gate (SUP-20260916 / 20):
+    # no-op for dev/test startup; fails closed on unsafe credentials or
+    # config only when OPEN_NOTEBOOK_ENV=production (or VPMS_STRICT_MODE=1).
+    from open_notebook.config_gate import maybe_run_production_validation
+    maybe_run_production_validation()
 
     # Security check: Encryption key
     if not get_secret_from_env("OPEN_NOTEBOOK_ENCRYPTION_KEY"):
@@ -398,6 +406,7 @@ app.include_router(commands_router.router, prefix="/api", tags=["commands"])
 app.include_router(podcasts.router, prefix="/api", tags=["podcasts"])
 app.include_router(episode_profiles.router, prefix="/api", tags=["episode-profiles"])
 app.include_router(speaker_profiles.router, prefix="/api", tags=["speaker-profiles"])
+app.include_router(vpms_package.router, prefix="/api", tags=["vpms-package"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(source_chat.router, prefix="/api", tags=["source-chat"])
 app.include_router(credentials.router, prefix="/api", tags=["credentials"])
@@ -413,4 +422,30 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    """Truthful health: probe the SurrealDB database and the command/
+    queue-store table. Never healthy by construction when a subsystem
+    is unreachable (SUP-20260916 workstream 1)."""
+    checks = {}
+    degraded = False
+
+    try:
+        rows = await asyncio.wait_for(repo_query("RETURN 1"), timeout=2.0)
+        checks["database"] = "ok" if rows else "empty"
+    except Exception:
+        checks["database"] = "unreachable"
+        degraded = True
+
+    try:
+        rows = await asyncio.wait_for(
+            repo_query("SELECT count() AS n FROM command GROUP BY n"), timeout=2.0
+        )
+        checks["queue_store"] = "ok"
+    except Exception:
+        checks["queue_store"] = "unreachable"
+        degraded = True
+
+    status = "degraded" if degraded else "ok"
+    return JSONResponse(
+        content={"status": status, "checks": checks},
+        status_code=200 if not degraded else 503,
+    )
